@@ -2,6 +2,7 @@ open import Function
 open import Data.Fin 
 open import Data.Nat
 open import Relation.Binary.PropositionalEquality hiding ([_])
+open import Data.Sum hiding ([_,_])
 
 module lam (n : ℕ) where
 
@@ -163,7 +164,6 @@ eq? (vₛ x) (vₛ y) with eq? x y
 
 
 -- # Here is my attempt to do subsitutions
-open import Data.Sum hiding ([_,_])
 
 split : τ ∈ (Γ ++ Δ) → τ ∈ Γ ⊎ τ ∈ Δ
 split {Δ = ε} v = inj₁ v
@@ -228,35 +228,72 @@ shift-sub {Ψ = ε} s = ε
 shift-sub {Ψ = Ψ ▹ (Ξ ⇒ i)} (s , x) = shift-sub s , rshift′ x
 
 
--- Not implemented yet
+-- Apply the function to the arguments.
+-- XXX: does this terminate?
+app : Nf Γ (Δ ⇒ i) → Sub Γ Δ → Nf Γ (ε ⇒ i)
+
+app₁ : Nf Γ ((Δ ▹ τ) ⇒ i) → Nf Γ τ → Nf Γ (Δ ⇒ i)
+app₁ (lam v₀ sp) e = 
+  let 
+    -- Morally we are doing `app e sp`
+    r = sub-sp v₀ sp (wk-sl sl-++-l e)
+    u = wk-sl sl-++-l e
+    x = app u r
+  in rshift x
+app₁ (lam (vₛ v) sp) e = lam v (sub-sp v₀ sp (wk-sl sl-++-l e))
+
+app {Δ = ε} e s = e
+app {Δ = Δ ▹ τ} e (s , x) = app (app₁ e x) s
+
+
+sub₀ : (v : τ ∈ Γ) (e : Nf Γ (base i)) (e₁ : Nf (Γ / v) τ) → Nf (Γ / v) (base i)
+sub₀ v (lam w sp) e₁ with eq? v w
+... | eq = app e₁ (sub-sp v sp e₁)
+... | neq .v y = lam y (sub-sp v sp e₁)
+
+
+sub₁ : (v : τ ∈ Γ) (e : Nf Γ ((ε ▹ δ) ⇒ i)) (e₁ : Nf (Γ / v) τ) → Nf (Γ / v) ((ε ▹ δ) ⇒ i)
+sub₁ v (lam w sp) e₁ with eq? (vₛ v) w
+... | eq = 
+  let 
+    r = wk-sl (skip sl-eq) e₁
+    u = app r (sub-sp (vₛ v) sp r)
+  in rshift u
+... | neq .(vₛ v) y = lam y (sub-sp (vₛ v) sp (wk-sl (skip sl-eq) e₁))
+
+
+sl-eq-id : (v : τ ∈ Γ) → ren sl-eq v ≡ v
+sl-eq-id v₀     = refl
+sl-eq-id (vₛ v) = cong vₛ (sl-eq-id v)
+
+ren-v-to-++ : (v : τ ∈ Γ) → SL (Γ / v) ((Γ ++ Δ) / ren sl-++-l v)
+ren-v-to-++ {Δ = ε} v rewrite sl-eq-id v = sl-eq
+ren-v-to-++ {Δ = Δ ▹ x} v = skip (ren-v-to-++ {Δ = Δ} v)
+
+ren-++-to-ren-v : (v : τ ∈ Γ) → SL ((Γ ++ Δ) / ren sl-++-l v) ((Γ / v) ++ Δ)
+ren-++-to-ren-v {Δ = ε} v rewrite sl-eq-id v = sl-eq
+ren-++-to-ren-v {Δ = Δ ▹ x} v = keep (ren-++-to-ren-v v)
+
+
 sub : (v : τ ∈ Γ) (e : Nf Γ σ) (e₁ : Nf (Γ / v) τ) → Nf (Γ / v) σ
-sub v (lam w sp) e₁ = ?
---   let 
---     f = sub-var-++ v w e₁ 
---     x = sub-sp-++ v sp e₁
---   in ?
+sub {σ = Δ ⇒ i} v e e₁ =
+  let
+    e′ = lshift e
+    e₁′ = wk-sl sl-++-l e₁
+    v′ = ren sl-++-l v
+    u = sub₀ v′ e′ (wk-sl (ren-v-to-++ {Δ = Δ} v) e₁′)
+    q = wk-sl (ren-++-to-ren-v v) u
+  in rshift q
 
---with split {Γ = Γ} {Δ} w
---... | inj₁ w′ = let r = sub-var v w′ e₁ in lam ? ?
---... | inj₂ w′ = lam (ren sl-++-r w′) (let q = sub-sp ? sp ? in ?)
-
-
---sub {Γ = Γ} v (lam {Δ = Δ} w ε) e₁ with split {Γ = Γ} {Δ} w
---... | inj₁ w′ = let r = sub-var v w′ e₁ in wk-vars sl-ε r
---... | inj₂ w′ = lam (ren sl-++-r w′) ε
---sub v (lam w (sp , x)) e₁ = ?
-
---lam (let r = sub-var ? w ? in ?) ?
+--sub-sp : (v : τ ∈ Γ) (sp : Sub Γ Δ) → Nf (Γ / v) τ → Sub (Γ / v) Δ
+sub-sp v ε e₁ = ε
+sub-sp v (sp , x) e₁ = sub-sp v sp e₁ , sub v x e₁
 
 
--- sub v (lam w sp) e₁ with eq? (ren sl-++-l v) w
--- sub v (lam .(ren sl-++-l v) sp) (lam w′ sp′) | eq = ?
--- --sub v (lam .(ren sl-++-l v) ε) (lam w′ sp′) | eq = lam (ren sl-++-l w′) (emb sp′ sl-++-l)
--- --sub v (lam .(ren sl-++-l v) (sp , x)) (lam w′ sp′) | eq = ?
--- ... | neq .(ren sl-++-l v) y = ?
 
 
 -- My attempt to introduce SubList as a basis for recursion.
+{-
 -- Doesn't seem to work
 module SubViaMinus where
   _⊝_ : (Γ : Con) → SL Δ Γ → Con
@@ -281,6 +318,7 @@ module SubViaMinus where
   ssub ε (lam v sp) s = lam v sp
   ssub (skip sl) (lam v sp) s = ?
   ssub (keep sl) (lam v sp) s = ?
+-}
 
 
 _[_] : Nf Γ τ → Sub Δ Γ → Nf Δ τ
