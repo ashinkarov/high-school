@@ -194,12 +194,8 @@ sub-var-++ {Γ = Γ} {σ = Ψ ⇒ i} {Δ = Δ} x y e | inj₂ y′
   = lam (ren (skip-left-++ {Ψ = Ψ} sl-++-r) y′) (sub-eq sl-++-r)
 
 
--- Not implemented yet
+-- Implemented, doesn't termiante
 sub-sp : (v : τ ∈ Γ) (sp : Sub Γ Δ) → Nf (Γ / v) τ → Sub (Γ / v) Δ
-
--- Not implemented yet
-sub-sp-++ : (v : τ ∈ Γ) (sp : Sub (Γ ++ Δ) Ψ) → Nf (Γ / v) τ → Sub ((Γ / v) ++ Δ) Ψ
-sub-sp-++ v sp e = ?
 
 -- Some helper functions
 sl-assoc : SL ((Γ ++ Δ) ++ Ψ) (Γ ++ (Δ ++ Ψ))
@@ -229,7 +225,6 @@ shift-sub {Ψ = Ψ ▹ (Ξ ⇒ i)} (s , x) = shift-sub s , rshift′ x
 
 
 -- Apply the function to the arguments.
--- XXX: does this terminate?
 app : Nf Γ (Δ ⇒ i) → Sub Γ Δ → Nf Γ (ε ⇒ i)
 
 app₁ : Nf Γ ((Δ ▹ τ) ⇒ i) → Nf Γ τ → Nf Γ (Δ ⇒ i)
