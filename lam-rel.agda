@@ -1,10 +1,16 @@
+-- NOTE: This file will be merged with lam.agda.
+--       I resolved non-tremination of the substitution in lam,
+--       but I didn't find the time to merge the two.
+
+
 open import Function
 open import Data.Fin 
 open import Data.Nat
 open import Relation.Binary.PropositionalEquality hiding ([_])
 open import Data.Sum hiding ([_,_])
+open import Data.Product
 
-module lam (n : ℕ) where
+module lam-rel (n : ℕ) where
 
 
 data Ty : Set
@@ -28,6 +34,13 @@ data _∈_ : Ty → Con → Set where
   v₀  : τ ∈ (Γ ▹ τ)
   vₛ  : τ ∈ Γ → τ ∈ (Γ ▹ σ)
 
+
+-- Merge Γ Δ Ψ = Γ ⊕ Δ = Ψ 
+data Merge : Con → Con → Con → Set where
+  ε    : Merge ε ε ε
+  skip : Merge Γ Δ Ψ → Merge Γ (Δ ▹ τ) (Ψ ▹ τ)
+  keep : Merge Γ Δ Ψ → Merge (Γ ▹ τ) Δ (Ψ ▹ τ)
+
 _++_ : Con → Con → Con
 Γ ++ ε       = Γ
 Γ ++ (Δ ▹ x) = (Γ ++ Δ) ▹ x
@@ -38,8 +51,67 @@ data Sub : Con → Con → Set where
   ε   : Sub Γ ε
   _,_ : Sub Γ Δ → Nf Γ τ → Sub Γ (Δ ▹ τ)
 
+{-
+data _⊆_ : Con → Con → Set where
+  ε    : ε ⊆ ε
+  skip : Γ ⊆ Δ → Γ ⊆ (Δ ▹ τ)
+  keep : Γ ⊆ Δ → (Γ ▹ τ) ⊆ (Δ ▹ τ)
+
+left : Γ ⊆ Δ → Con
+left {Γ = Γ} m = Γ
+
+right : Γ ⊆ Δ → Con
+right {Δ = ε}     ε        = ε
+right {Δ = Δ ▹ x} (skip s) = right s ▹ x
+right {Δ = Δ ▹ x} (keep s) = right s
+
+-}
+
 data Nf where
   lam : (Ψ ⇒ i) ∈ (Γ ++ Δ) → Sub (Γ ++ Δ) Ψ → Nf Γ (Δ ⇒ i)
+  --lam : Merge Γ Δ Ψ → (Ξ ⇒ i) ∈ Ψ → Sub Ψ Ξ → Nf Γ (Δ ⇒ i)
+  
+  --lam : ∀ {ΓΔ} → (m : Γ ⊆ ΓΔ) → (Ψ ⇒ i) ∈ (ΓΔ) → Sub (ΓΔ) Ψ → Nf (left m) (right m ⇒ i)
+ 
+{-
+ren : (s : Γ ⊆ Δ) → τ ∈ left s → τ ∈ Δ
+ren (skip s) v = vₛ (ren s v)
+ren (keep s) v₀ = v₀
+ren (keep s) (vₛ v) = vₛ (ren s v)
+
+ren′ : (s : Γ ⊆ Δ) → τ ∈ right s → τ ∈ Δ
+ren′ (skip s) v₀ = v₀
+ren′ (skip s) (vₛ v) = vₛ (ren′ s v)
+ren′ (keep s) v = vₛ (ren′ s v)
+
+
+_/_ : (Γ : Con) → τ ∈ Γ → Con
+(Γ ▹ τ) / v₀    = Γ
+(Γ ▹ τ) / vₛ v  = (Γ / v) ▹ τ
+
+⊆-refl : Γ ⊆ Γ
+⊆-refl {ε}     = ε
+⊆-refl {Γ ▹ x} = keep ⊆-refl
+
+/-⊆ : (v : τ ∈ Γ) → (Γ / v) ⊆ Γ
+/-⊆ v₀ = skip ⊆-refl
+/-⊆ (vₛ v) = keep (/-⊆ v)
+
+xxx : (v : τ ∈ Γ) → (Γ / v) ⊆ Δ → ∃ λ Ψ → Γ ⊆ Ψ
+xxx v₀ s = _ , keep s
+xxx (vₛ v) (skip s) = let Ψ , r = xxx (vₛ v) s in _ , r
+xxx (vₛ v) (keep s) = let Ψ , r = xxx v s in _ , keep r
+
+wkv  : (v : τ ∈ Γ) → σ ∈ (Γ / v) → σ ∈ Γ
+wkv v w = ren (/-⊆ v) w
+
+wk   : (v : τ ∈ Γ) → Nf (Γ / v) σ → Nf Γ σ
+wk v (lam s w sp) = let
+  Ψ , r = xxx v s
+  k = lam r ? ?
+  in ?
+
+-}
 
 
 
@@ -205,6 +277,11 @@ sl-assoc : SL ((Γ ++ Δ) ++ Ψ) (Γ ++ (Δ ++ Ψ))
 sl-assoc {Ψ = ε}     = sl-eq
 sl-assoc {Ψ = Ψ ▹ x} = keep (sl-assoc {Ψ = Ψ})
 
+sl-assoc-≡ : ((Γ ++ Δ) ++ Ψ) ≡ (Γ ++ (Δ ++ Ψ))
+sl-assoc-≡ {Ψ = ε} = refl
+sl-assoc-≡ {Ψ = Ψ ▹ x} = cong (_▹ x) (sl-assoc-≡ {Ψ = Ψ})
+
+
 lshift : Nf Γ (Δ ⇒ i) → Nf (Γ ++ Δ) (ε ⇒ i)
 lshift {Δ = ε} e = e
 lshift {Δ = Δ ▹ x} (lam v sp) = lam v sp
@@ -244,20 +321,20 @@ app {Δ = ε} e s = e
 app {Δ = Δ ▹ τ} e (s , x) = app (app₁ e x) s
 
 
-sub₀ : (v : τ ∈ Γ) (e : Nf Γ (base i)) (e₁ : Nf (Γ / v) τ) → Nf (Γ / v) (base i)
-sub₀ v (lam w sp) e₁ with eq? v w
-... | eq = app e₁ (sub-sp v sp e₁)
-... | neq .v y = lam y (sub-sp v sp e₁)
+-- sub₀ : (v : τ ∈ Γ) (e : Nf Γ (base i)) (e₁ : Nf (Γ / v) τ) → Nf (Γ / v) (base i)
+-- sub₀ v (lam w sp) e₁ with eq? v w
+-- ... | eq = app e₁ (sub-sp v sp e₁)
+-- ... | neq .v y = lam y (sub-sp v sp e₁)
 
 
-sub₁ : (v : τ ∈ Γ) (e : Nf Γ ((ε ▹ δ) ⇒ i)) (e₁ : Nf (Γ / v) τ) → Nf (Γ / v) ((ε ▹ δ) ⇒ i)
-sub₁ v (lam w sp) e₁ with eq? (vₛ v) w
-... | eq = 
-  let 
-    r = wk-sl (skip sl-eq) e₁
-    u = app r (sub-sp (vₛ v) sp r)
-  in rshift u
-... | neq .(vₛ v) y = lam y (sub-sp (vₛ v) sp (wk-sl (skip sl-eq) e₁))
+-- sub₁ : (v : τ ∈ Γ) (e : Nf Γ ((ε ▹ δ) ⇒ i)) (e₁ : Nf (Γ / v) τ) → Nf (Γ / v) ((ε ▹ δ) ⇒ i)
+-- sub₁ v (lam w sp) e₁ with eq? (vₛ v) w
+-- ... | eq = 
+--   let 
+--     r = wk-sl (skip sl-eq) e₁
+--     u = app r (sub-sp (vₛ v) sp r)
+--   in rshift u
+-- ... | neq .(vₛ v) y = lam y (sub-sp (vₛ v) sp (wk-sl (skip sl-eq) e₁))
 
 
 sl-eq-id : (v : τ ∈ Γ) → ren sl-eq v ≡ v
@@ -269,19 +346,47 @@ ren-v-to-++ {Δ = ε} v rewrite sl-eq-id v = sl-eq
 ren-v-to-++ {Δ = Δ ▹ x} v = skip (ren-v-to-++ {Δ = Δ} v)
 
 ren-++-to-ren-v : (v : τ ∈ Γ) → SL ((Γ ++ Δ) / ren sl-++-l v) ((Γ / v) ++ Δ)
-ren-++-to-ren-v {Δ = ε} v rewrite sl-eq-id v = sl-eq
+ren-++-to-ren-v {Δ = ε} v rewrite sl-eq-id v = sl-eq -- TODO this rewrite can be eliminated
 ren-++-to-ren-v {Δ = Δ ▹ x} v = keep (ren-++-to-ren-v v)
+
+ren-++-≡-ren-v : (v : τ ∈ Γ) → ((Γ ++ Δ) / ren sl-++-l v) ≡ ((Γ / v) ++ Δ)
+ren-++-≡-ren-v {Δ = ε} v rewrite sl-eq-id v = refl
+ren-++-≡-ren-v {Δ = Δ ▹ x} v = cong (_▹ x) (ren-++-≡-ren-v v)
 
 
 sub : (v : τ ∈ Γ) (e : Nf Γ σ) (e₁ : Nf (Γ / v) τ) → Nf (Γ / v) σ
-sub {σ = Δ ⇒ i} v e e₁ =
-  let
-    e′ = lshift e
-    e₁′ = wk-sl sl-++-l e₁
-    v′ = ren sl-++-l v
-    u = sub₀ v′ e′ (wk-sl (ren-v-to-++ {Δ = Δ} v) e₁′)
-    q = wk-sl (ren-++-to-ren-v v) u
-  in rshift q
+sub-sp-++ : (v : τ ∈ Γ) (sp : Sub (Γ ++ Δ) Ψ) → Nf (Γ / v) τ → Sub ((Γ / v) ++ Δ) Ψ
+sub-sp-++ {Δ = ε} v sp e = sub-sp v sp e
+sub-sp-++ {Δ = Δ ▹ x} v ε e = ε
+sub-sp-++ {Δ = Δ ▹ x} v (_,_ {τ = τ} sp x₁) e
+  = sub-sp-++ v sp e 
+  , let k = sub (ren sl-++-l v) x₁ (wk-sl (ren-v-to-++ {Δ = Δ ▹ x} v) e) 
+    --in subst (λ G → Nf G τ) (cong (_▹ x) (ren-++-≡-ren-v v)) k
+    in wk-sl (keep (ren-++-to-ren-v v)) k
+
+wk-ctx : Nf Γ τ → Nf (Γ ++ Δ) τ
+wk-ctx {Δ = ε} t = t
+wk-ctx {Δ = Δ ▹ x} t = wk v₀ (wk-ctx t)
+
+
+sub {σ = Δ ⇒ i} v (lam w sp) e₁ with split {Δ = Δ} w
+... | inj₂ y = lam (ren sl-++-r y) (sub-sp-++ v sp e₁)
+... | inj₁ x with eq? v x
+... | eq = let 
+  sp′ = (sub-sp-++ v sp e₁)
+  r = app (wk-ctx e₁) sp′
+  in rshift r
+... | neq .v y = lam (ren sl-++-l y) (sub-sp-++ v sp e₁) 
+
+-- sub : (v : τ ∈ Γ) (e : Nf Γ σ) (e₁ : Nf (Γ / v) τ) → Nf (Γ / v) σ
+-- sub {σ = Δ ⇒ i} v e e₁ =
+--   let
+--     e′ = lshift e
+--     e₁′ = wk-sl sl-++-l e₁
+--     v′ = ren sl-++-l v
+--     u = sub₀ v′ e′ (wk-sl (ren-v-to-++ {Δ = Δ} v) e₁′)
+--     q = wk-sl (ren-++-to-ren-v v) u
+--   in rshift q
 
 --sub-sp : (v : τ ∈ Γ) (sp : Sub Γ Δ) → Nf (Γ / v) τ → Sub (Γ / v) Δ
 sub-sp v ε e₁ = ε
@@ -339,6 +444,8 @@ record _≅_ (τ σ : Ty) : Set where
 -- TODO
 thm : τ ~ σ ↔ τ ≅ σ
 thm = {!!}
+
+
 
 {-
 module T where
