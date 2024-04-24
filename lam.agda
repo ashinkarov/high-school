@@ -3,9 +3,10 @@ open import Data.Fin
 open import Data.Nat
 open import Relation.Binary.PropositionalEquality hiding ([_])
 open import Data.Sum hiding ([_,_])
+open import Data.Product
+open import Data.Empty
 
 module lam (n : ℕ) where
-
 
 data Ty : Set
 
@@ -28,6 +29,7 @@ data _∈_ : Ty → Con → Set where
   v₀  : τ ∈ (Γ ▹ τ)
   vₛ  : τ ∈ Γ → τ ∈ (Γ ▹ σ)
 
+
 _++_ : Con → Con → Con
 Γ ++ ε       = Γ
 Γ ++ (Δ ▹ x) = (Γ ++ Δ) ▹ x
@@ -38,10 +40,9 @@ data Sub : Con → Con → Set where
   ε   : Sub Γ ε
   _,_ : Sub Γ Δ → Nf Γ τ → Sub Γ (Δ ▹ τ)
 
+
 data Nf where
   lam : (Ψ ⇒ i) ∈ (Γ ++ Δ) → Sub (Γ ++ Δ) Ψ → Nf Γ (Δ ⇒ i)
-
-
 
 
 -- Heredetary permutation
@@ -57,100 +58,88 @@ data _~ᶜ_ where
   ε : ε ~ᶜ ε
   ext : Γ ~ᶜ Δ → τ ~ σ → Insert Δ σ Ψ → (Γ ▹ τ) ~ᶜ Ψ
 
+data _⊆_ : Con → Con → Set where
+  ε    : ε ⊆ ε
+  skip : Γ ⊆ Δ → Γ ⊆ (Δ ▹ τ)
+  keep : Γ ⊆ Δ → (Γ ▹ τ) ⊆ (Δ ▹ τ)
 
--- Sublists
-data SL : Con → Con → Set where
-  ε : SL ε ε
-  skip : SL Γ Δ → SL Γ (Δ ▹ τ)
-  keep : SL Γ Δ → SL (Γ ▹ τ) (Δ ▹ τ)
+⊆-eq : Γ ⊆ Γ
+⊆-eq {ε}     = ε
+⊆-eq {Γ ▹ τ} = keep ⊆-eq
 
-sl-eq : SL Γ Γ
-sl-eq {ε} = ε
-sl-eq {Γ ▹ x} = keep sl-eq
+⊆-ε : ε ⊆ Γ
+⊆-ε {ε}     = ε
+⊆-ε {Γ ▹ τ} = skip ⊆-ε
 
-sl-ε : SL ε Γ
-sl-ε {ε} = ε
-sl-ε {Γ ▹ x} = skip sl-ε
+⊆-skip-++-r : Γ ⊆ Δ → Γ ⊆ (Δ ++ Ψ)
+⊆-skip-++-r {Ψ = ε}     s = s
+⊆-skip-++-r {Ψ = Ψ ▹ τ} s = skip (⊆-skip-++-r s)
 
--- TODO: Brush these implementations
-sl-++-l : SL Γ (Γ ++ Δ)
-sl-++-l {Δ = ε} = sl-eq
-sl-++-l {Δ = Δ ▹ x} = skip sl-++-l
+⊆-skip-++-l : Γ ⊆ Δ → Γ ⊆ (Ψ ++ Δ)
+⊆-skip-++-l ε        = ⊆-ε
+⊆-skip-++-l (skip s) = skip (⊆-skip-++-l s)
+⊆-skip-++-l (keep s) = keep (⊆-skip-++-l s)
 
-sl-++-r : SL Δ (Γ ++ Δ)
-sl-++-r {Δ = ε} = sl-ε
-sl-++-r {Δ = Δ ▹ x} = keep sl-++-r
+⊆-cong-++-l : Γ ⊆ Δ → (Ψ ++ Γ) ⊆ (Ψ ++ Δ)
+⊆-cong-++-l ε        = ⊆-eq
+⊆-cong-++-l (skip s) = skip (⊆-cong-++-l s)
+⊆-cong-++-l (keep s) = keep (⊆-cong-++-l s)
 
-++-right : SL Γ Δ → SL (Γ ++ Ψ) (Δ ++ Ψ)
-++-right {Ψ = ε} s = s
-++-right {Ψ = Ψ ▹ x} s = keep (++-right s)
+⊆-cong-++-r : Γ ⊆ Δ → (Γ ++ Ψ) ⊆ (Δ ++ Ψ)
+⊆-cong-++-r {Ψ = ε}     s = s
+⊆-cong-++-r {Ψ = Ψ ▹ τ} s = keep (⊆-cong-++-r s)
 
-++-left : SL Γ Δ → SL (Ψ ++ Γ) (Ψ ++ Δ)
-++-left ε = sl-eq
-++-left (skip sl) = skip (++-left sl)
-++-left (keep sl) = keep (++-left sl)
+r-⊆-++ : Δ ⊆ (Γ ++ Δ)
+r-⊆-++ = ⊆-skip-++-l ⊆-eq
 
-skip-left-++ : SL Γ Δ → SL Γ (Δ ++ Ψ)
-skip-left-++ {Ψ = ε} sl = sl
-skip-left-++ {Ψ = Ψ ▹ x} sl = skip (skip-left-++ sl)
+l-⊆-++ : Γ ⊆ (Γ ++ Δ)
+l-⊆-++ = ⊆-skip-++-r ⊆-eq
+
+-- This might be easier to use this self-contained formulation
+-- in the proofs, beacuse it kind of inlines ⊆-eq.
+--l-⊆-++ : SL Γ (Γ ++ Δ)
+--l-⊆-++ {ε}     {Δ = ε}     = ε
+--l-⊆-++ {Γ ▹ τ} {Δ = ε}     = keep l-⊆-++
+--l-⊆-++ {Γ ▹ _} {Δ = Δ ▹ τ} = skip l-⊆-++
 
 
+-- Γ / v computes a new context which is Γ without the variable v
 _/_ : (Γ : Con) → τ ∈ Γ → Con
 (Γ ▹ τ) / v₀    = Γ
 (Γ ▹ τ) / vₛ v  = (Γ / v) ▹ τ
 
-wkv  : (v : τ ∈ Γ) → σ ∈ (Γ / v) → σ ∈ Γ
-wk   : (v : τ ∈ Γ) → Nf (Γ / v) σ → Nf Γ σ
-↑_ : Nf Γ σ → Nf (Γ ▹ τ) σ
-↑_ = wk v₀
+/⇒⊆ : (v : τ ∈ Γ) → (Γ / v) ⊆ Γ
+/⇒⊆ v₀     = skip ⊆-eq
+/⇒⊆ (vₛ v) = keep (/⇒⊆ v)
 
-ren : SL Γ Δ → τ ∈ Γ → τ ∈ Δ
-ren (skip s) x = vₛ (ren s x)
-ren (keep s) v₀ = v₀
+ren : Γ ⊆ Δ → τ ∈ Γ → τ ∈ Δ
+ren (skip s) x      = vₛ (ren s x)
+ren (keep s) v₀     = v₀
 ren (keep s) (vₛ x) = vₛ (ren s x)
 
-sub-p : Sub Δ Γ → Sub (Δ ▹ τ) Γ
-sub-p ε = ε
-sub-p (s , x) = sub-p s , (↑ x)
+-- Specialcase of renaming that we use in Eq,
+-- but we cannot simply write `wkv = ren (/⇒⊆ v)` because
+-- Γ ⊆ Γ is not a constructor.
+wkv  : (v : τ ∈ Γ) → σ ∈ (Γ / v) → σ ∈ Γ
+wk   : (v : τ ∈ Γ) → Nf (Γ / v) σ → Nf Γ σ
 
-sub-eq : SL Γ Δ → Sub Δ Γ
-sub-eq ε = ε
-sub-eq (skip s) = sub-p (sub-eq s)
-sub-eq (keep {τ = Ψ ⇒ i} s) = sub-p (sub-eq s) , lam (ren sl-++-l v₀) (sub-eq sl-++-r)
-
-
-emb : Sub Γ Δ → SL Γ Ψ → Sub Ψ Δ
-wk-sl : SL Γ Δ → Nf Γ τ → Nf Δ τ
-wk-sl ε e = e
-wk-sl (skip s) (lam v sp) = lam (ren (++-right (skip s)) v) (emb sp (++-right (skip s)))
-wk-sl (keep s) (lam v sp) = lam (ren (++-right (keep s)) v) (emb sp (++-right (keep s)))
-
-emb ε sl = ε
-emb (s , x) ε = s , x
-emb (s , x) (skip sl) = emb s (skip sl) , wk-sl (skip sl) x
-emb (s , x) (keep sl) = emb s (keep sl) , wk-sl (keep sl) x
-
-
-wkv v₀ w = vₛ w
-wkv (vₛ v) v₀ = v₀
+wkv v₀     w      = vₛ w
+wkv (vₛ v) v₀     = v₀
 wkv (vₛ v) (vₛ w) = vₛ (wkv v w)
 
-wksub : (v : τ ∈ Γ) → Sub (Γ / v) Δ → Sub Γ Δ
-wksub v  ε       = ε
-wksub v  (s , t) = wksub v s , wk v t
 
-sl-/ : (v : τ ∈ Γ) → SL (Γ / v) Γ
-sl-/ v₀ = skip sl-eq
-sl-/ (vₛ v) = keep (sl-/ v)
+emb : Γ ⊆ Ψ → Sub Γ Δ → Sub Ψ Δ
+wk-sl : Γ ⊆ Δ → Nf Γ τ → Nf Δ τ
+wk-sl ε        e          = e
+wk-sl (skip s) (lam v sp) = lam (ren (⊆-cong-++-r (skip s)) v) (emb (⊆-cong-++-r (skip s)) sp)
+wk-sl (keep s) (lam v sp) = lam (ren (⊆-cong-++-r (keep s)) v) (emb (⊆-cong-++-r (keep s)) sp)
 
-wkv++ : (v : τ ∈ Γ) → σ ∈ ((Γ / v) ++ Δ) → σ ∈ (Γ ++ Δ)
-wkv++ v x = ren (++-right (sl-/ v)) x
+emb sl        ε        = ε
+emb ε         (s , x)  = s , x
+emb (skip sl) (s , x)  = emb (skip sl) s , wk-sl (skip sl) x
+emb (keep sl) (s , x)  = emb (keep sl) s , wk-sl (keep sl) x
 
-wksub++ : (v : τ ∈ Γ) → Sub ((Γ / v) ++ Δ) Ψ → Sub (Γ ++ Δ) Ψ
-wksub++ v s = emb s (++-right (sl-/ v))
-
-
-wk v (lam t s) = lam (wkv++ v t) (wksub++ v s)
+wk v e = wk-sl (/⇒⊆ v) e
 
 data Eq : τ ∈ Γ → σ ∈ Γ → Set where
   eq  : {x : τ ∈ Γ} → Eq x x
@@ -166,8 +155,6 @@ eq? (vₛ x) (vₛ y) with eq? x y
 ... | neq .x y = neq (vₛ x) (vₛ y)
 
 
--- # Here is my attempt to do subsitutions
-
 split : τ ∈ (Γ ++ Δ) → τ ∈ Γ ⊎ τ ∈ Δ
 split {Δ = ε} v = inj₁ v
 split {Δ = Δ ▹ x} v₀ = inj₂ v₀
@@ -176,158 +163,201 @@ split {Δ = Δ ▹ x} (vₛ v) with split {Δ = Δ} v
 ... | inj₂ v = inj₂ (vₛ v)
 
 
-wk-vars : SL Δ Ψ → Nf Γ (Δ ⇒ i) → Nf Γ (Ψ ⇒ i)
-wk-vars ε (lam v sp) = lam v sp
-wk-vars (skip sl) (lam v sp) = lam (ren (skip (++-left sl)) v) (emb sp (skip (++-left sl)))
-wk-vars (keep sl) (lam v sp) = lam (ren (keep (++-left sl)) v) (emb sp (keep (++-left sl)))
-
-
--- This works
-sub-var : (v : τ ∈ Γ) → σ ∈ Γ → Nf (Γ / v) τ → Nf (Γ / v) σ
-sub-var x y e with eq? x y
-... | eq = e
-sub-var {σ = Δ ⇒ i} x .(wkv x y) e | neq .x y = lam (ren sl-++-l y) (sub-eq sl-++-r)
-
--- This works
-sub-var-++ : (v : τ ∈ Γ) → σ ∈ (Γ ++ Δ) → Nf (Γ / v) τ → Nf ((Γ / v) ++ Δ) σ
-sub-var-++ {Γ = Γ} {Δ = Δ} x y e with split {Γ = Γ}{Δ} y
-... | inj₁ y′ 
-  = let t = sub-var x y′ e in wk-sl sl-++-l t
-sub-var-++ {Γ = Γ} {σ = Ψ ⇒ i} {Δ = Δ} x y e | inj₂ y′ 
-  = lam (ren (skip-left-++ {Ψ = Ψ} sl-++-r) y′) (sub-eq sl-++-r)
-
-
--- Implemented, doesn't termiante
-sub-sp : (v : τ ∈ Γ) (sp : Sub Γ Δ) → Nf (Γ / v) τ → Sub (Γ / v) Δ
-
--- Some helper functions
-sl-assoc : SL ((Γ ++ Δ) ++ Ψ) (Γ ++ (Δ ++ Ψ))
-sl-assoc {Ψ = ε}     = sl-eq
-sl-assoc {Ψ = Ψ ▹ x} = keep (sl-assoc {Ψ = Ψ})
-
+-- Shift part of the context into the type and back
+-- This is a different way to look at the same term
 lshift : Nf Γ (Δ ⇒ i) → Nf (Γ ++ Δ) (ε ⇒ i)
-lshift {Δ = ε} e = e
-lshift {Δ = Δ ▹ x} (lam v sp) = lam v sp
+lshift {Δ = ε}     e          = e
+lshift {Δ = Δ ▹ τ} (lam v sp) = lam v sp
 
 rshift : Nf (Γ ++ Δ) (ε ⇒ i) → Nf Γ (Δ ⇒ i)
-rshift {Δ = ε} e = e
-rshift {Δ = Δ ▹ x} (lam v sp) = lam v sp
+rshift {Δ = ε}     e          = e
+rshift {Δ = Δ ▹ τ} (lam v sp) = lam v sp
 
-rshift′ : Nf (Γ ++ Δ) (Ξ ⇒ i) → Nf Γ ((Δ ++ Ξ) ⇒ i)
-rshift′ {Ξ = ε} e = rshift e
-rshift′ {Ξ = Ξ ▹ x} (lam v sp) = lam (ren (keep (sl-assoc {Ψ = Ξ})) v) 
-                                     (emb sp (keep (sl-assoc {Ψ = Ξ})))
+-- wk-vars : SL Δ Ψ → Nf Γ (Δ ⇒ i) → Nf Γ (Ψ ⇒ i)
+-- wk-vars ε (lam v sp) = lam v sp
+-- wk-vars (skip sl) (lam v sp) = lam (ren (skip (⊆-cong-++-l sl)) v) (emb sp (skip (⊆-cong-++-l sl)))
+-- wk-vars (keep sl) (lam v sp) = lam (ren (keep (⊆-cong-++-l sl)) v) (emb sp (keep (⊆-cong-++-l sl)))
 
-shift-con : (Ψ : Con) (Γ : Con) → Con
-shift-con ε Γ = ε
-shift-con (Ψ ▹ (Ξ ⇒ i)) Γ = shift-con Ψ Γ ▹ ((Γ ++ Ξ) ⇒ i)
 
-shift-sub : Sub (Γ ++ Δ) Ψ → Sub Γ (shift-con Ψ Δ)
-shift-sub {Ψ = ε} s = ε
-shift-sub {Ψ = Ψ ▹ (Ξ ⇒ i)} (s , x) = shift-sub s , rshift′ x
+-- The interplay between ren, _++_ and l-⊆-++
+-- 
+-- We need these equations for the induction step inside the
+-- substitution.  We can eiter use equalites (≡), or we can reduce
+-- all the expressions downto ⊆
+⊆-eq-id : (v : τ ∈ Γ) → ren ⊆-eq v ≡ v
+⊆-eq-id v₀     = refl
+⊆-eq-id (vₛ v) = cong vₛ (⊆-eq-id v)
 
+ren-v-eq₁ : (v : τ ∈ Γ) → (Γ / v) ⊆ (Γ / ren l-⊆-++ v)
+ren-v-eq₁ v₀     = ⊆-eq
+ren-v-eq₁ (vₛ v) = keep (ren-v-eq₁ v)
+
+ren-v-eq₂ : (v : τ ∈ Γ) → (Γ / ren l-⊆-++ v) ⊆ (Γ / v) 
+ren-v-eq₂ v₀     = ⊆-eq
+ren-v-eq₂ (vₛ v) = keep (ren-v-eq₂ v)
+
+ren-v-to-++ : (v : τ ∈ Γ) → (Γ / v) ⊆ ((Γ ++ Δ) / ren l-⊆-++ v)
+ren-v-to-++ {Δ = ε}     v = ren-v-eq₁ v -- rewrite ⊆-eq-id v = ⊆-eq
+ren-v-to-++ {Δ = Δ ▹ τ} v = skip (ren-v-to-++ {Δ = Δ} v)
+
+ren-++-to-ren-v : (v : τ ∈ Γ) → ((Γ ++ Δ) / ren l-⊆-++ v) ⊆ ((Γ / v) ++ Δ)
+ren-++-to-ren-v {Δ = ε}     v = ren-v-eq₂ v -- rewrite ⊆-eq-id v = ⊆-eq
+ren-++-to-ren-v {Δ = Δ ▹ τ} v = keep (ren-++-to-ren-v v)
+
+⊆-++-assocₗ : ((Γ ++ Δ) ++ Ψ) ⊆ (Γ ++ (Δ ++ Ψ))
+⊆-++-assocₗ {Ψ = ε}     = ⊆-eq
+⊆-++-assocₗ {Ψ = Ψ ▹ x} = keep (⊆-++-assocₗ {Ψ = Ψ})
+
+⊆-++-assocᵣ : (Γ ++ (Δ ++ Ψ)) ⊆ ((Γ ++ Δ) ++ Ψ)
+⊆-++-assocᵣ {Ψ = ε}     = ⊆-eq
+⊆-++-assocᵣ {Ψ = Ψ ▹ τ} = keep (⊆-++-assocᵣ {Ψ = Ψ})
+
+-- Thes properties are not needed yet
+module _ where
+  _∙_ : Ψ ⊆ Δ → Γ ⊆ Ψ → Γ ⊆ Δ
+  ε      ∙ p      = p
+  skip s ∙ p      = skip (s ∙ p)
+  keep s ∙ skip p = skip (s ∙ p)
+  keep s ∙ keep p = keep (s ∙ p)
+
+  ++-assoc : (Γ ++ Δ) ++ Ψ ≡ Γ ++ (Δ ++ Ψ)
+  ++-assoc {Ψ = ε}     = refl
+  ++-assoc {Ψ = Ψ ▹ τ} = cong (_▹ τ) (++-assoc {Ψ = Ψ})
+
+  Γ▹τ⊈Γ : (Γ ++ (Δ ▹ τ)) ⊆ Γ → ⊥
+  Γ▹τ⊈Γ {.(Γ ▹ τ)} {Δ} {τ₁} (skip {Δ = Γ} {τ} s) 
+    rewrite ++-assoc {Γ} {ε ▹ τ} {Δ ▹ τ₁} = Γ▹τ⊈Γ s
+  Γ▹τ⊈Γ {.((Δ ▹ x) ▹ _)} {ε} (keep {Δ = Δ ▹ x} (skip s)) = Γ▹τ⊈Γ s
+  Γ▹τ⊈Γ {.((Δ ▹ x) ▹ x)} {ε} (keep {Δ = Δ ▹ x} (keep s)) = Γ▹τ⊈Γ s
+  Γ▹τ⊈Γ {.(Γ ▹ τ)} {Δ ▹ x} {τ} (keep {Δ = Γ} s) 
+    rewrite ++-assoc {Γ} {ε ▹ τ} {Δ ▹ x} = Γ▹τ⊈Γ s
+
+  ⊆⇒≡ : Γ ⊆ Δ → Δ ⊆ Γ → Γ ≡ Δ
+  ⊆⇒≡ ε p               = refl
+  ⊆⇒≡ (skip s) p        = ⊥-elim (Γ▹τ⊈Γ (s ∙ p))
+  ⊆⇒≡ (keep s) (skip p) = ⊥-elim (Γ▹τ⊈Γ (s ∙ p))
+  ⊆⇒≡ (keep s) (keep p) = cong₂ _▹_ (⊆⇒≡ s p) refl
+
+
+sub-sp : (v : τ ∈ Γ) (sp : Sub Γ Δ) → Nf (Γ / v) τ → Sub (Γ / v) Δ
 
 -- Apply the function to the arguments.
-app : Nf Γ (Δ ⇒ i) → Sub Γ Δ → Nf Γ (ε ⇒ i)
-
+app  : Nf Γ (Δ ⇒ i) → Sub Γ Δ → Nf Γ (ε ⇒ i)
 app₁ : Nf Γ ((Δ ▹ τ) ⇒ i) → Nf Γ τ → Nf Γ (Δ ⇒ i)
+
 app₁ (lam v₀ sp) e = 
   let 
     -- Morally we are doing `app e sp`
-    r = sub-sp v₀ sp (wk-sl sl-++-l e)
-    u = wk-sl sl-++-l e
+    r = sub-sp v₀ sp (wk-sl l-⊆-++ e)
+    u = wk-sl l-⊆-++ e
     x = app u r
   in rshift x
-app₁ (lam (vₛ v) sp) e = lam v (sub-sp v₀ sp (wk-sl sl-++-l e))
+app₁ (lam (vₛ v) sp) e = lam v (sub-sp v₀ sp (wk-sl l-⊆-++ e))
 
-app {Δ = ε} e s = e
+app {Δ = ε}     e s       = e
 app {Δ = Δ ▹ τ} e (s , x) = app (app₁ e x) s
 
 
-sub₀ : (v : τ ∈ Γ) (e : Nf Γ (base i)) (e₁ : Nf (Γ / v) τ) → Nf (Γ / v) (base i)
-sub₀ v (lam w sp) e₁ with eq? v w
-... | eq = app e₁ (sub-sp v sp e₁)
-... | neq .v y = lam y (sub-sp v sp e₁)
+-- sub₀ : (v : τ ∈ Γ) (e : Nf Γ (base i)) (e₁ : Nf (Γ / v) τ) → Nf (Γ / v) (base i)
+-- sub₀ v (lam w sp) e₁ with eq? v w
+-- ... | eq = app e₁ (sub-sp v sp e₁)
+-- ... | neq .v y = lam y (sub-sp v sp e₁)
 
 
-sub₁ : (v : τ ∈ Γ) (e : Nf Γ ((ε ▹ δ) ⇒ i)) (e₁ : Nf (Γ / v) τ) → Nf (Γ / v) ((ε ▹ δ) ⇒ i)
-sub₁ v (lam w sp) e₁ with eq? (vₛ v) w
-... | eq = 
-  let 
-    r = wk-sl (skip sl-eq) e₁
-    u = app r (sub-sp (vₛ v) sp r)
-  in rshift u
-... | neq .(vₛ v) y = lam y (sub-sp (vₛ v) sp (wk-sl (skip sl-eq) e₁))
+-- sub₁ : (v : τ ∈ Γ) (e : Nf Γ ((ε ▹ δ) ⇒ i)) (e₁ : Nf (Γ / v) τ) → Nf (Γ / v) ((ε ▹ δ) ⇒ i)
+-- sub₁ v (lam w sp) e₁ with eq? (vₛ v) w
+-- ... | eq = 
+--   let 
+--     r = wk-sl (skip ⊆-eq) e₁
+--     u = app r (sub-sp (vₛ v) sp r)
+--   in rshift u
+-- ... | neq .(vₛ v) y = lam y (sub-sp (vₛ v) sp (wk-sl (skip ⊆-eq) e₁))
 
-
-sl-eq-id : (v : τ ∈ Γ) → ren sl-eq v ≡ v
-sl-eq-id v₀     = refl
-sl-eq-id (vₛ v) = cong vₛ (sl-eq-id v)
-
-ren-v-to-++ : (v : τ ∈ Γ) → SL (Γ / v) ((Γ ++ Δ) / ren sl-++-l v)
-ren-v-to-++ {Δ = ε} v rewrite sl-eq-id v = sl-eq
-ren-v-to-++ {Δ = Δ ▹ x} v = skip (ren-v-to-++ {Δ = Δ} v)
-
-ren-++-to-ren-v : (v : τ ∈ Γ) → SL ((Γ ++ Δ) / ren sl-++-l v) ((Γ / v) ++ Δ)
-ren-++-to-ren-v {Δ = ε} v rewrite sl-eq-id v = sl-eq
-ren-++-to-ren-v {Δ = Δ ▹ x} v = keep (ren-++-to-ren-v v)
+-- ren-++-≡-ren-v : (v : τ ∈ Γ) → ((Γ ++ Δ) / ren l-⊆-++ v) ≡ ((Γ / v) ++ Δ)
+-- ren-++-≡-ren-v {Δ = ε} v rewrite ⊆-eq-id v = refl
+-- ren-++-≡-ren-v {Δ = Δ ▹ x} v = cong (_▹ x) (ren-++-≡-ren-v v)
 
 
 sub : (v : τ ∈ Γ) (e : Nf Γ σ) (e₁ : Nf (Γ / v) τ) → Nf (Γ / v) σ
-sub {σ = Δ ⇒ i} v e e₁ =
-  let
-    e′ = lshift e
-    e₁′ = wk-sl sl-++-l e₁
-    v′ = ren sl-++-l v
-    u = sub₀ v′ e′ (wk-sl (ren-v-to-++ {Δ = Δ} v) e₁′)
-    q = wk-sl (ren-++-to-ren-v v) u
-  in rshift q
 
---sub-sp : (v : τ ∈ Γ) (sp : Sub Γ Δ) → Nf (Γ / v) τ → Sub (Γ / v) Δ
+sub-sp-++ : (v : τ ∈ Γ) (sp : Sub (Γ ++ Δ) Ψ) → Nf (Γ / v) τ → Sub ((Γ / v) ++ Δ) Ψ
+sub-sp-++ {Δ = ε}     v sp e = sub-sp v sp e
+sub-sp-++ {Δ = Δ ▹ x} v ε  e = ε
+sub-sp-++ {Δ = Δ ▹ x} v (_,_ {τ = τ} sp x₁) e
+  = sub-sp-++ v sp e 
+  , let k = sub (ren l-⊆-++ v) x₁ (wk-sl (ren-v-to-++ {Δ = Δ ▹ x} v) e) 
+    in wk-sl (keep (ren-++-to-ren-v v)) k
+
+-- TODO: Upgrade to general Γ ⊆ Δ → Nf Γ → Nf Δ
+wk-ctx : Nf Γ τ → Nf (Γ ++ Δ) τ
+wk-ctx {Δ = ε} t = t
+wk-ctx {Δ = Δ ▹ x} t = wk v₀ (wk-ctx t)
+
+
+sub {σ = Δ ⇒ i} v (lam w sp) e₁ with split {Δ = Δ} w
+... | inj₂ y = lam (ren r-⊆-++ y) (sub-sp-++ v sp e₁)
+... | inj₁ x with eq? v x
+... | eq = let 
+  sp′ = (sub-sp-++ v sp e₁)
+  r = app (wk-ctx e₁) sp′
+  in rshift r
+... | neq .v y = lam (ren l-⊆-++ y) (sub-sp-++ v sp e₁) 
+
+
 sub-sp v ε e₁ = ε
 sub-sp v (sp , x) e₁ = sub-sp v sp e₁ , sub v x e₁
 
 
+-- TODO, we can inline these helpers
+rshiftx : Nf (Γ ++ Δ) (Ψ ⇒ i) → Nf Γ ((Δ ++ Ψ) ⇒ i)
+rshiftx {Γ} {Δ} {Ψ} e =
+  let 
+    e₁ = lshift e
+    e₂ = wk-sl (⊆-++-assocₗ {Γ} {Δ}) e₁
+  in rshift e₂
+
+lshiftx : Nf Γ ((Δ ++ Ψ) ⇒ i) → Nf (Γ ++ Δ) (Ψ ⇒ i)
+lshiftx {Γ} {Δ} {Ψ} e =
+  let
+    e₁ = lshift e
+    e₂ = wk-sl (⊆-++-assocᵣ {Γ} {Δ}) e₁
+  in rshift e₂
 
 
--- My attempt to introduce SubList as a basis for recursion.
-{-
--- Doesn't seem to work
-module SubViaMinus where
-  _⊝_ : (Γ : Con) → SL Δ Γ → Con
-  ε ⊝ ε = ε
-  (Γ ▹ x) ⊝ skip sl = (Γ ⊝ sl) ▹ x
-  (Γ ▹ _) ⊝ keep sl = Γ ⊝ sl
-  
-  lookup : Sub Γ Δ → τ ∈ Δ → Nf Γ τ
-  lookup (s , x) v₀ = x
-  lookup (s , x) (vₛ v) = lookup s v
-  
-  
-  ssub-sp : -- (v : τ ∈ Γ)   (sp : Sub Γ Δ) → Nf (Γ / v) τ → Sub (Γ / v) Δ
-               (sl : SL Δ Γ) (sp : Sub Γ Ψ) → Sub (Γ ⊝ sl) Γ → Sub (Γ ⊝ sl) Ψ
-  
-  ssub-var : (sl : SL Δ Γ) → σ ∈ Γ → Sub (Γ ⊝ sl) Γ → Nf (Γ ⊝ sl) σ
-  ssub-var sl v s = lookup s v
-  
-  
-  ssub : -- (v : τ ∈ Γ)   (e : Nf Γ σ) (e₁ : Nf (Γ / v) τ) → Nf (Γ / v) σ
-            (sl : SL Δ Γ) (e : Nf Γ σ) → (Sub (Γ ⊝ sl) Γ) → Nf (Γ ⊝ sl) σ
-  ssub ε (lam v sp) s = lam v sp
-  ssub (skip sl) (lam v sp) s = ?
-  ssub (keep sl) (lam v sp) s = ?
--}
 
+_[_] : Nf Γ σ → Sub Δ Γ → Nf Δ σ
+_[_] {ε}     e s = wk-sl ⊆-ε e
+_[_] {Γ ▹ τ} {Ψ ⇒ i} {Δ} e (s , x) =
+  let
+    e₁ : Nf Γ (((ε ▹ τ) ++ Ψ) ⇒ i)
+    e₁ = rshiftx e
 
-_[_] : Nf Γ τ → Sub Δ Γ → Nf Δ τ
-lam v sp [ us ] = ?
+    e₂ = e₁ [ s ]
+
+    e₃ = Nf (Δ ▹ τ) (Ψ ⇒ i)
+    e₃ = lshiftx {Δ = ε ▹ τ} e₂
+
+  in sub v₀ e₃ x
 
 
 -- # Main theorem
 
+-- XXX this looks complicated, can we simplify this a bit?
+↑_ : Nf Γ σ → Nf (Γ ▹ τ) σ
+↑_ = wk v₀
+
+sub-p : Sub Δ Γ → Sub (Δ ▹ τ) Γ
+sub-p ε       = ε
+sub-p (s , x) = sub-p s , (↑ x)
+
+sub-eq : Γ ⊆ Δ → Sub Δ Γ
+sub-eq ε                    = ε
+sub-eq (skip s)             = sub-p (sub-eq s)
+sub-eq (keep {τ = Ψ ⇒ i} s) = sub-p (sub-eq s) , lam (ren l-⊆-++ v₀) (sub-eq r-⊆-++)
+
 -- This works.
 id-nf : Nf (Γ ▹ τ) τ
-id-nf {τ = Δ ⇒ i} = lam (ren sl-++-l v₀) (sub-eq sl-++-r)
+id-nf {τ = Δ ⇒ i} = lam (ren l-⊆-++ v₀) (sub-eq r-⊆-++)
 
 record _≅_ (τ σ : Ty) : Set where
   field
@@ -340,80 +370,5 @@ record _≅_ (τ σ : Ty) : Set where
 thm : τ ~ σ ↔ τ ≅ σ
 thm = {!!}
 
-{-
-module T where
-  data Tys (n : ℕ) : Set
-  
-  data Ty (n : ℕ) : Set where
-    _⇒_ : Tys n → Fin n → Ty n
-  
-  data Tys n where
-    • : Tys n
-    _,_ : Tys n → Ty n → Tys n
-  
-  variable m n : ℕ
-  variable i j : Fin n
-  variable Γ Δ Θ   : Tys n
-  variable A B : Ty n
-  
-  _++_ : Tys n → Tys n → Tys n
-  Γ ++ • = Γ
-  Γ ++ (Δ , A) = (Γ ++ Δ) , A
-  
-  data Var : Tys n → Ty n → Set where
-    zero : Var (Γ , A) A
-    suc : Var Γ A → Var (Γ , B) A
-  
-  data Subst : Tys n → Tys m → Set
-  
-  -- data Ne : Tys n → Fin n → Set
-  
-  data Nf : Tys n → Ty n → Set where
-  --  lam : Ne (Γ ++ Δ) i → Nf Γ (Δ ⇒ i)
-    lam : Var (Γ ++ Δ) (Θ ⇒ i) → Subst (Γ ++ Δ) Θ → Nf Γ (Δ ⇒ i) 
-    
-  -- data Ne where
-  --   app : Var Γ (Δ ⇒ i) → Subst Γ Δ → Ne Γ i
-  
-  data Subst where
-    ε : Subst {n = n} Γ (• {n = n})
-    _,_ : Subst Γ Δ → Nf Γ A → Subst Γ (Δ , A)
-  
-  --- Heredetary permutations
-  
-  module _{n : ℕ} where
-  
-    data Insert  : Tys n → Ty n → Tys n → Set where
-      zero : Insert Γ A (Γ , A)
-      suc : Insert Γ A Δ → Insert (Γ , B) A (Δ , B)
-  
-    data _~_ : Ty n → Ty n → Set 
-  
-    data _~s_ : Tys n → Tys n → Set where
-      • : • ~s • 
-      ext : Γ ~s Δ → A ~ B → Insert Δ B Θ → (Γ , A) ~s Θ
-  
-    data _~_ where
-      perm : Γ ~s Δ → (Γ ⇒ i) ~ (Δ ⇒ i)
-  
-  -- Heredetary substitutions
-  
-  zero-nf : Nf (Γ , A) A
-  zero-nf = {!!}
-  
-  _[_] : Nf Γ A → Subst Δ Γ → Nf Δ A
-  t [ us ] = {!!}
-  -- https://dl.acm.org/doi/pdf/10.1145/1863597.1863601
-  
-  -- definitional isomorphism
-  
-  record _≅_ (A B : Ty n) : Set where
-    field
-      φ : Nf (• , A) B
-      ψ : Nf (• , B) A
-      Φψ : (φ [ (ε , ψ) ]) ≡ zero-nf
-      ψφ : (ψ [ (ε , φ) ]) ≡ zero-nf
-  
-  thm : A ~ B ↔ A ≅ B
-  thm = {!!}
--}
+
+
