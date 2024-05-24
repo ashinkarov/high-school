@@ -25,7 +25,6 @@ variable
   τ σ σ' δ δ' ρ : Ty
   i j   : Fin n
 
-{-
 dom : Ty → Con
 dom (base i) = ε
 dom (σ ⇒ τ) = dom τ ▷ σ
@@ -37,7 +36,6 @@ cod (σ ⇒ τ) = cod τ
 _⇒*_ : Con → Fin n → Ty
 ε ⇒* i = base i
 (Γ ▷ σ) ⇒* i = σ ⇒ (Γ ⇒* i)
--}
 
 data Var : Con → Ty → Set where
   zero : Var (Γ ▷ σ) σ
@@ -52,70 +50,24 @@ data Nf where
   lam : Nf (Γ ▷ σ) τ → Nf Γ (σ ⇒ τ)
   ne : Ne Γ (base i) → Nf Γ (base i)
 
---record _~_ (σ τ : Ty) : Set
+record _~_ (σ τ : Ty) : Set
 
+data Insert : Con → Ty → Con → Set where
+  zero : σ ~ σ' → Insert Δ σ (Δ ▷ σ')
+  suc : Insert Γ σ Γσ → Insert (Γ ▷ τ) σ (Γσ ▷ τ)
 
-  
-data Con* : Set 
+data _~C_ : Con → Con → Set where
+  refl-ε : ε ~C ε
+  ext : Γ ~C Δ → Insert Δ σ Δσ → (Γ ▷ σ) ~C Δσ 
 
-record Ty* : Set where
+record _~_ σ τ  where
   inductive
   field
-    dom : Con*
-    cod : Fin n
-
-open Ty*
-
-variable
-  Γ* Δ* Ψ* Γσ* Δσ* : Con*
-  τ* σ* σ*' δ* δ*' ρ* : Ty*
-
-data Con*  where
-  ε   : Con*
-  _▷_ : Con* → Ty* → Con*
-
-ty→ty* : Ty → Ty*
-dom (ty→ty* (base i)) = ε
-cod (ty→ty* (base i)) = i
-dom (ty→ty* (σ ⇒ τ)) = dom (ty→ty* τ) ▷ (ty→ty* σ)
-cod (ty→ty* (σ ⇒ τ)) = cod (ty→ty* τ)
-
-_⇒*_ : Con* → Fin n → Ty
-ty*→ty : Ty* → Ty
-ty*→ty record { dom = dom ; cod = cod } = dom ⇒* cod
-
-ε ⇒* i = base i
-(Γ ▷ σ) ⇒* i = (ty*→ty σ) ⇒ (Γ ⇒* i)
-
-record _~*_ (σ τ : Ty*) : Set
-
-data Insert : Con* → Ty* → Con* → Set where
-  zero : σ* ~* σ*' → Insert Δ* σ* (Δ* ▷ σ*')
-  suc : Insert Γ* σ* Γσ* → Insert (Γ* ▷ τ*) σ* (Γσ* ▷ τ*)
-
-data _~C*_ : Con* → Con* → Set where
-  refl-ε : ε ~C* ε
-  ext : Γ* ~C* Δ* → Insert Δ* σ* Δσ* → (Γ* ▷ σ*) ~C* Δσ* 
-
-record _~*_ σ τ  where
-  inductive
-  field
-    dom~ : (dom σ) ~C* (dom τ)
+    dom~ : (dom σ) ~C (dom τ)
     cod≡ : cod σ ≡ cod τ
 
-open _~*_
+open _~_
 
-refl~C* : Γ* ~C* Γ*
-
-refl~* : σ* ~* σ*
-refl~* {σ* = record { dom = dom ; cod = cod }} =
-  record { dom~ = refl~C* {Γ* = dom} ;
-           cod≡ = refl }
-
-refl~C* {Γ* = ε} = refl-ε
-refl~C* {Γ* = Γ* ▷ σ*} = ext refl~C* (zero refl~*)
-
-{-
 {-
 data _~_ where
   refl-base : base i ~ base i
@@ -128,7 +80,7 @@ refl~ {σ = σ ⇒ τ} = ext refl~ (zero refl~)
 
 refl~C : Γ ~C Γ
 refl~ : σ ~ σ
-refl~ = 
+refl~ = record { dom~ = refl~C ; cod≡ = refl }
 {-
 dom~ refl~ = refl~C
 cod≡ refl~ = refl
@@ -137,11 +89,10 @@ cod≡ refl~ = refl
 refl~C {Γ = ε} = refl-ε
 refl~C {Γ = Γ ▷ σ} = ext refl~C (zero (refl~ {σ = σ}))
 
-{-
 tst : (σ ⇒ τ  ⇒ base i) ~ (τ ⇒ σ ⇒ base i)
 dom~ tst = {!!}
 cod≡ tst = refl
--}
+
 sym~ : σ ~ τ → τ ~ σ
 sym~ = {!!}
 
@@ -184,4 +135,3 @@ definitional iso ⇒ types are hedperm
 
 -}
   
--}
