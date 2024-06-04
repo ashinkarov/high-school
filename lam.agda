@@ -45,18 +45,6 @@ data Nf where
   lam : (Ψ ⇒ i) ∈ (Γ ++ Δ) → Sub (Γ ++ Δ) Ψ → Nf Γ (Δ ⇒ i)
 
 
--- Heredetary permutation
-data Insert : Con → Ty → Con → Set where
-  zero : Insert Γ τ (Γ ▹ τ)
-  suc  : Insert Γ τ Δ → Insert (Γ ▹ σ) τ (Δ ▹ σ)
-
-data _~ᶜ_ : Con → Con → Set
-data _~_ : Ty → Ty → Set where
-  perm : Γ ~ᶜ Δ → (Γ ⇒ i) ~ (Δ ⇒ i)
-
-data _~ᶜ_ where
-  ε : ε ~ᶜ ε
-  ext : Γ ~ᶜ Δ → τ ~ σ → Insert Δ σ Ψ → (Γ ▹ τ) ~ᶜ Ψ
 
 data _⊆_ : Con → Con → Set where
   ε    : ε ⊆ ε
@@ -359,12 +347,33 @@ sub-eq (keep {τ = Ψ ⇒ i} s) = sub-p (sub-eq s) , lam (ren l-⊆-++ v₀) (su
 id-nf : Nf (Γ ▹ τ) τ
 id-nf {τ = Δ ⇒ i} = lam (ren l-⊆-++ v₀) (sub-eq r-⊆-++)
 
+-- Heredetary permutation
+data Insert : Con → Ty → Con → Set where
+  zero : Insert Γ τ (Γ ▹ τ)
+  suc  : Insert Γ τ Δ → Insert (Γ ▹ σ) τ (Δ ▹ σ)
+
+data _~ᶜ_ : Con → Con → Set
+data _~_ : Ty → Ty → Set where
+  perm : Γ ~ᶜ Δ → (Γ ⇒ i) ~ (Δ ⇒ i)
+
+data _~ᶜ_ where
+  ε : ε ~ᶜ ε
+  ext : Γ ~ᶜ Δ → τ ~ σ → Insert Δ σ Ψ → (Γ ▹ τ) ~ᶜ Ψ
+
 record _≅_ (τ σ : Ty) : Set where
   field
     φ  : Nf (ε ▹ τ) σ
     ψ  : Nf (ε ▹ σ) τ
     Φψ : φ [ ε , ψ ] ≡ id-nf
     ψφ : ψ [ ε , φ ] ≡ id-nf
+
+
+fwd : τ ~ σ → τ ≅ σ
+fwd (perm ε) = 
+  record { φ = id-nf ; ψ = id-nf ; Φψ = refl ; ψφ = refl }
+fwd (perm {i = i} (ext Γ~Δ τ~σ Δiσ≈Ψ)) = ?
+  
+
 
 -- TODO
 thm : τ ~ σ ↔ τ ≅ σ
