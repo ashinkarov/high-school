@@ -69,11 +69,11 @@ data Nf where
   ne : Ne Γ (base i) → Nf Γ (base i)
 
 module P where
-  data _~_ : Ty → Ty → Set 
-  
+  data _~_ : Ty → Ty → Set
+
   data Ins : Ty → Ty → Ty → Set where
     zero : τ ~ τ' → Ins τ σ (τ' ⇒ σ)
-    suc  : Ins τ σ δ → Ins τ (ρ ⇒ σ) (ρ ⇒ δ) 
+    suc  : Ins τ σ δ → Ins τ (ρ ⇒ σ) (ρ ⇒ δ)
 
   data _~_ where
     zero : base i ~ base i
@@ -92,7 +92,7 @@ module P where
   symh : τ ~ σ → Ins δ τ σ' → σ' ~ (δ ⇒ σ)
   symh p (zero t) = suc p (zero (sym~ t))
   symh (suc p x) (suc i) = suc (symh p i) (suc x)
-  
+
   sym~ zero = zero
   sym~ (suc p x) = symh (sym~ p) x
 
@@ -145,7 +145,7 @@ module _ where
 -- Equality of two variables
 data Eq : τ ∈ Γ → σ ∈ Γ → Set where
   eq  : {x : τ ∈ Γ} → Eq x x
-  neq : (x : τ ∈ Γ) → (y : σ ∈ Γ / x) → Eq x (wkv x y) 
+  neq : (x : τ ∈ Γ) → (y : σ ∈ Γ / x) → Eq x (wkv x y)
 
 
 eq? : (x : τ ∈ Γ) (y : σ ∈ Γ) → Eq x y
@@ -205,17 +205,17 @@ idᵣ : Ren Γ Γ
 idᵣ v = _ , (refl~ , v)
 
 _∘ᵣ_ : Ren Ψ Δ → Ren Γ Ψ → Ren Γ Δ
-(f ∘ᵣ g) v = 
-   let 
+(f ∘ᵣ g) v =
+   let
      _ , (f~ , fv) = f v
      _ , (g~ , gfv) = g fv
    in _ , (trans~ f~ g~) , gfv
 
 rprep : Ren Γ Δ → σ ~ τ → Ren (Γ ▹ τ) (Δ ▹ σ)
 rprep r p~ v₀ = _ , p~ , v₀
-rprep r p~ (vₛ v) = 
-   let 
-     _ , (r~ , rv) = r v 
+rprep r p~ (vₛ v) =
+   let
+     _ , (r~ , rv) = r v
    in _ , r~ , vₛ rv
 
 ext-ren : Ren Γ Δ → Ren (ext τ Γ) (ext τ Δ)
@@ -237,7 +237,7 @@ module _ where
   data Veq : τ ∈ Γ → σ ∈ Γ → Set where
     eq : ∀ (x : τ ∈ Γ) → Veq x x
 
-  ext-eq : (w : τ ∈ Γ) → (v : τ' ∈ ext σ Γ) 
+  ext-eq : (w : τ ∈ Γ) → (v : τ' ∈ ext σ Γ)
       → (Veq v (ext-var {σ = σ} w)) ⊎ (τ' ∈ ext σ (Γ / w))
   ext-eq {σ = base x} w v with eq? w v
   ... | eq       = inj₁ (eq w)
@@ -249,7 +249,7 @@ module _ where
   ext-suc {σ = σ ⇒ σ₁} w v = ext-suc {σ = σ₁} (vₛ w) v
 
   insh : Ren (ext τ Γ) (ext σ Δ) → Ins δ σ σ' → Ren (ext (δ ⇒ τ) Γ) (ext σ' Δ)
-  insh {τ = τ}{Γ = Γ}{σ = σ}{Δ = Δ} r (zero {τ' = τ'} x) v 
+  insh {τ = τ}{Γ = Γ}{σ = σ}{Δ = Δ} r (zero {τ' = τ'} x) v
     with ext-eq {σ = σ} v₀ v
   ... | inj₁ (eq .(ext-var {σ = σ} v₀)) = _ , (sym~ x) , (ext-var {σ = τ} v₀)
   ... | inj₂ y = let _ , p~ , y' = r y in _ , p~ , (ext-suc {σ = τ} v₀ y')
@@ -280,13 +280,13 @@ module _ where
          → τ' ~ σ' → Sp (ext τ Γ) τ' (base $ cod σ)
          → Sp (ext τ Γ) σ' (base $ cod σ)
   shufsp r i=j zero s = s
-  shufsp {τ = τ}{σ = σ} r i=j (suc p~ i) (h ◃ s) 
+  shufsp {τ = τ}{σ = σ} r i=j (suc p~ i) (h ◃ s)
     = inssp (shufsp {τ = τ}{σ = σ} r i=j p~ s) i h
 
   rensp : Ren (ext τ Γ) (ext σ Δ) → cod τ ≡ cod σ
           → Sp (ext σ Δ) τ' σ' → Sp (ext τ Γ) τ' σ'
   rennf {τ = τ}{σ = σ}{Δ = Δ} r i=j e with liftnf e
-  ... | ne (app f sp) = 
+  ... | ne (app f sp) =
     let
       _ , (f~ , f') = r f
       sp' = rensp {τ = τ}{σ = σ}{Δ = Δ} r i=j sp
@@ -295,7 +295,7 @@ module _ where
     in foldnf (ne (app f' sp'''))
 
   rensp r i=j ε = ε
-  rensp {τ = τ}{σ = σ} r i=j (_◃_ {τ = τ'} x s) 
+  rensp {τ = τ}{σ = σ} r i=j (_◃_ {τ = τ'} x s)
     = rennf (ext-ren {τ = τ'} r) refl x ◃ rensp {τ = τ}{σ = σ} r i=j s
 
 
@@ -317,7 +317,7 @@ id-nf = lam (nenf (app v₀ ε))
 
 
 module SanityRenTest where
-  testtm : Nf Γ (τ ⇒ σ ⇒ τ) 
+  testtm : Nf Γ (τ ⇒ σ ⇒ τ)
   testtm = lam (lam (nvar (vₛ v₀)))
 
   -- NOTE: this is is self inverse in terms of sym~
@@ -327,7 +327,7 @@ module SanityRenTest where
   test-ren : Nf Γ (base i ⇒ base j ⇒ base j)
   test-ren = ren' test~ testtm
 
-  _ : test-ren {Γ = Γ}{i = i}{j = j} 
+  _ : test-ren {Γ = Γ}{i = i}{j = j}
       ≡ lam (lam (ne (app v₀ ε)))
   _ = refl
 
@@ -340,12 +340,12 @@ module SanityRenTest where
 
   test-ren₁ : Nf Γ (base i ⇒ (base j ⇒ base i ⇒ base k) ⇒ base j ⇒ base k)
   test-ren₁ = ren' (sym~ test₁~) testtm₁
-  
+
   _ : test-ren₁ {Γ = Γ}{i = i}{j = j}{k = k}
       ≡ lam
          (lam
           (lam
-           (ne (app (vₛ v₀) 
+           (ne (app (vₛ v₀)
                (ne (app v₀ ε)
                 ◃ ne (app (vₛ (vₛ v₀)) ε)
                 ◃ ε)))))
@@ -373,7 +373,7 @@ module _ where
   appnf (lam f) x = sub v₀ f x
 
 
-_∘-nf_ : Nf Γ (τ ⇒ ρ) → Nf Γ (σ ⇒ τ) → Nf Γ (σ ⇒ ρ) 
+_∘-nf_ : Nf Γ (τ ⇒ ρ) → Nf Γ (σ ⇒ τ) → Nf Γ (σ ⇒ ρ)
 f ∘-nf g = lam (appnf (wknf v₀ f) (appnf (wknf v₀ g) (nvar v₀)))
 
 
@@ -391,26 +391,70 @@ symsym : (στ : σ ~ τ) → στ ≡ sym~ (sym~ στ)
 symsym = {!!}
 
 
+-- FIXME: termination chcker gets upset
+module _ where
+  {-# TERMINATING #-}
+  sound-fun : τ ~ σ → Nf Γ (τ ⇒ σ)
 
 
-sound-fun : σ ~ τ → Nf ε (σ ⇒ τ)
-sound-fun zero = lam (ne (app v₀ ε))
-sound-fun (suc στ i) = lam ?
+  ins-to-ext : Ins δ σ σ' → Nf (ext σ' Γ) δ
+  ins-to-ext {σ = σ} (zero p~) =
+    -- FIXME: This is where Agda's termination checker gets upset.
+    --        We need to convert `Nf Γ τ` (which is a variable) into
+    --        `Nf Γ σ`, and we have `τ ~ σ`.
+    let
+      r = sound-fun (sym~ p~)
+      q = appnf r (nvar $ ext-var {σ = σ} v₀)
+    in q
+  ins-to-ext (suc i) = ins-to-ext i
 
--- sound-fun (suc στ (zero x)) = ?
--- sound-fun (suc στ (suc i)) = ?
+  ext-wk-nf' : (v : τ ∈ Γ) → Nf (ext σ (Γ / v)) δ → Nf (ext σ Γ) δ
+  ext-wk-nf' {σ = base x} v e = wknf v e
+  ext-wk-nf' {σ = σ ⇒ σ₁} v e = ext-wk-nf' {σ = σ₁} (vₛ v) e
 
-sound-retr : (στ : σ ~ τ) → (sound-fun στ) ∘-nf (sound-fun (sym~ στ)) ≡ id-nf
+  ext-wk-sp' : (v : τ ∈ Γ) → Sp (ext σ (Γ / v)) τ' σ' → Sp (ext σ Γ) τ' σ'
+  ext-wk-sp' {σ = base x} v s = wksp v s
+  ext-wk-sp' {σ = σ ⇒ σ₁} v s = ext-wk-sp' {σ = σ₁} (vₛ v) s
+
+
+  ext-wk-nfi : Nf (ext σ Γ) τ → Ins δ σ σ' → Nf (ext σ' Γ) τ
+  ext-wk-nfi {σ = σ} e (zero x) = ext-wk-nf' {σ = σ} v₀ e
+  ext-wk-nfi e (suc i) = ext-wk-nfi e i
+
+  ext-wk-spi : Sp (ext σ Γ) τ (base i) → Ins δ σ σ' → Sp (ext σ' Γ) τ (base i)
+  ext-wk-spi ε i = ε
+  ext-wk-spi {σ = σ} (x ◃ s) (zero x₁) = ext-wk-nf' {σ = σ} v₀ x ◃ ext-wk-sp' {σ = σ} v₀ s
+  ext-wk-spi (x ◃ s) (suc i) = ext-wk-nfi x i ◃ ext-wk-spi s i
+
+  sp-step : Sp (ext σ Γ) τ (base i) → Ins δ σ σ' → Sp (ext σ' Γ) (δ ⇒ τ) (base i)
+  sp-step s i = ins-to-ext i ◃ ext-wk-spi s i
+
+  soundsp : τ ~ σ → Sp (ext σ (Γ )) τ (base $ cod τ)
+  soundsp zero = ε
+  soundsp {τ} {σ} (suc p~ i) = sp-step (soundsp p~) i
+
+  sound-fun {τ} {σ} p~ =
+    let
+      sp = soundsp {Γ = _ ▹ τ} p~
+      -- TODO: try to get rid of this conversion
+      sp' = subst (λ x → Sp (ext σ _) τ (base x)) (cod~ p~) sp
+    in lam (foldnf (ne (app (ext-var {σ = σ} v₀) sp')))
+
+  sound-funε : τ ~ σ → Nf ε (τ ⇒ σ)
+  sound-funε = sound-fun
+
+
+sound-retr : (στ : σ ~ τ) → (sound-funε στ) ∘-nf (sound-funε (sym~ στ)) ≡ id-nf
 sound-retr = {!!}
 
-sound : σ ~ τ → σ ≅ τ 
+sound : σ ~ τ → σ ≅ τ
 φ (sound στ) = sound-fun στ
 ψ (sound στ) = sound-fun (sym~ στ)
 φψ (sound στ) = sound-retr στ
 ψφ (sound στ) = {!!} -- use rewrite symsym
 
 {-
-types are hedperm ⇒ definitional iso 
+types are hedperm ⇒ definitional iso
 definitional iso ⇒ types are hedperm
 
 -}
@@ -419,7 +463,7 @@ definitional iso ⇒ types are hedperm
 
 
 {-
-data Con* : Set 
+data Con* : Set
 
 record Ty* : Set where
   inductive
@@ -458,7 +502,7 @@ data Insert : Con* → Ty* → Con* → Set where
 
 data _~C*_ : Con* → Con* → Set where
   refl-ε : ε ~C* ε
-  ext : Γ* ~C* Δ* → Insert Δ* σ* Δσ* → (Γ* ▷ σ*) ~C* Δσ* 
+  ext : Γ* ~C* Δ* → Insert Δ* σ* Δσ* → (Γ* ▷ σ*) ~C* Δσ*
 
 record _~*_ σ τ  where
   inductive
@@ -484,7 +528,7 @@ refl~C* {Γ* = Γ* ▷ σ*} = ext refl~C* (zero refl~*)
 {-
 data _~_ where
   refl-base : base i ~ base i
-  ext : σ ~ τ → Insert τ δ τδ → (δ ⇒ σ) ~ τδ   
+  ext : σ ~ τ → Insert τ δ τδ → (δ ⇒ σ) ~ τδ
 
 refl~ : σ ~ σ
 refl~ {σ = base i} = refl-base
@@ -493,7 +537,7 @@ refl~ {σ = σ ⇒ τ} = ext refl~ (zero refl~)
 
 refl~C : Γ ~C Γ
 refl~ : σ ~ σ
-refl~ = 
+refl~ =
 {-
 dom~ refl~ = refl~C
 cod≡ refl~ = refl
@@ -511,5 +555,5 @@ sym~ : σ ~ τ → τ ~ σ
 sym~ = {!!}
 
 
-  
+
 -}
