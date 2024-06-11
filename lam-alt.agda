@@ -1,6 +1,7 @@
 open import Function
 open import Data.Fin using (Fin; zero; suc)
 open import Data.Nat
+open import Data.Nat.Properties using (≤-refl; <⇒≤; +-comm; +-assoc; ≤-step)
 open import Relation.Binary.PropositionalEquality hiding ([_])
 open import Data.Sum hiding ([_,_])
 open import Data.Product
@@ -89,6 +90,7 @@ module P where
 
 
   sym~ : τ ~ σ → σ ~ τ
+
   symh : τ ~ σ → Ins δ τ σ' → σ' ~ (δ ⇒ σ)
   symh p (zero t) = suc p (zero (sym~ t))
   symh (suc p x) (suc i) = suc (symh p i) (suc x)
@@ -166,6 +168,8 @@ ext : Ty → Con → Con
 ext (base x) Γ = Γ
 ext (τ ⇒ σ) Γ = (ext σ (Γ ▹ τ))
 
+-- Measure the number of arguments that
+-- the given type has.
 len : Ty → ℕ
 len (base x) = 0
 len (τ ⇒ σ) = 1 + len σ
@@ -189,6 +193,14 @@ foldnf {τ = τ ⇒ τ₁} e = lam (foldnf e)
 lift-fold : (e : Nf Γ τ) → foldnf (liftnf e) ≡ e
 lift-fold {τ = base x} e = refl
 lift-fold {τ = τ ⇒ τ₁} (lam e) = cong lam (lift-fold e)
+
+len~ : τ ~ σ → len τ ≡ len σ
+lenins : Ins δ σ σ' → len σ' ≡ suc (len σ)
+lenins (zero x) = refl
+lenins (suc i) = cong suc (lenins i)
+len~ zero = refl
+len~ (suc p x) rewrite lenins x = cong suc (len~ p)
+
 
 record Var (Γ : Con) (τ : Ty) : Set where
   constructor var
@@ -230,7 +242,7 @@ ext-var {σ = σ ⇒ σ'} v = ext-var {σ = σ'} (vₛ v)
 -- ins-var {σ = σ} (zero p) = var p (ext-var {σ = σ} v₀)
 -- ins-var (suc i) = ins-var i
 
--- Comput renaming from the _~_
+-- Compute renaming from the _~_
 module _ where
   perm~ : τ ~ σ → Ren Γ Δ → Ren (ext τ Γ) (ext σ Δ)
 
@@ -320,7 +332,7 @@ module SanityRenTest where
   testtm : Nf Γ (τ ⇒ σ ⇒ τ)
   testtm = lam (lam (nvar (vₛ v₀)))
 
-  -- NOTE: this is is self inverse in terms of sym~
+  -- NOTE: this is a self inverse in terms of sym~
   test~ : (τ ⇒ σ ⇒ δ) ~ (σ ⇒ τ ⇒ δ)
   test~ = suc (suc refl~ ins-zero) (suc ins-zero)
 
@@ -387,8 +399,114 @@ record _≅_ (σ τ : Ty) : Set where
 
 open _≅_
 
-symsym : (στ : σ ~ τ) → στ ≡ sym~ (sym~ στ)
-symsym = {!!}
+module SymSym where
+  {-# TERMINATING #-}
+  symsym : (p : τ ~ σ) → sym~ (sym~ p) ≡ p
+
+  symsymh : (p : τ ~ σ) (i : Ins δ σ σ') → ∀ (q : σ ~ τ) → sym~ p ≡ q → sym~ (symh q i) ≡ suc p i
+  symsymh p (zero x) q e rewrite (sym e) | symsym p | symsym x = refl
+  symsymh (suc p x) (suc i) (suc q x₁) e
+      rewrite symsymh (sym~ q) i q (symsym q)
+              | sym (cong sym~ e)
+              | symsymh p x (sym~ p) refl = refl
+
+  symsym zero = refl
+  symsym (suc p i) = symsymh p i (sym~ p) refl
+
+
+
+-- Here we define symsym that terminates.  We do this by
+-- carrying by chosing a size function on the type that
+-- decreases on every recursive call.  This works, but this
+-- is really ugly.
+module _ where
+  -- helper lemmas
+  suc-inj : ∀ {m n : ℕ} → _≡_ {A = ℕ} (suc m) (suc n) → m ≡ n
+  suc-inj refl = refl
+
+  <-subl : ∀ {m n k : ℕ} → m < n → m ≡ k → k < n
+  <-subl m<n refl = m<n
+
+  suc-+ : ∀ {m n} → suc (m + n) ≡ m + suc n
+  suc-+ {zero} = refl
+  suc-+ {suc m} = cong suc suc-+
+
+  -- Our size function
+  LEN : Ty → ℕ
+  LEN (base x) = 1
+  LEN (τ ⇒ σ) = suc (LEN τ + LEN σ)
+
+  -- Proof that _~_ preserves LEN
+  LEN~ : τ ~ σ → LEN τ ≡ LEN σ
+  LENins : Ins δ σ σ' → LEN σ' ≡ suc (LEN δ + LEN σ)
+  LENins (zero x) = cong (suc ∘′ (_+ LEN _)) (sym (LEN~ x))
+  LENins (suc {τ} {σ} {δ} {ρ} i) rewrite LENins i | suc-+ {LEN τ} {LEN σ}
+                                         | suc-+ {LEN ρ} {LEN σ}
+                                         | sym $ +-assoc (LEN ρ) (LEN τ) (suc (LEN σ))
+                                         | sym $ +-assoc (LEN τ) (LEN ρ) (suc (LEN σ))
+                                         | +-comm (LEN τ) (LEN ρ)
+                                         = cong suc refl -- boring assoc/comm
+  LEN~ zero = refl
+  LEN~ (suc p x) rewrite LENins x = cong (suc ∘′ (LEN _ +_)) (LEN~ p)
+
+  -- More helper lemmas
+  m+n<k⇒n<k : ∀ {m n k} → (m + n) < k → n < k
+  m+n<k⇒n<k {zero} m+n<k = m+n<k
+  m+n<k⇒n<k {suc m} (s≤s m+n<k) = <⇒≤ (s≤s (m+n<k⇒n<k {m} m+n<k))
+
+  m+n<k⇒m<k : ∀ {m n k} → (m + n) < k → m < k
+  m+n<k⇒m<k {m} {n} m+n<k rewrite +-comm m n = m+n<k⇒n<k m+n<k
+
+  <-prev : ∀ {m n} → suc m < suc n → m < n
+  <-prev (s≤s p) = p
+
+  <-elim-mid : ∀ {a b c d e} → d > 0 → a + b < suc c → b ≡ suc (d + e) → suc (a + e) < c
+  <-elim-mid {a}{b}{c}{suc d}{e} d>0 (s≤s p) refl
+     rewrite
+       +-comm d e
+       | sym (suc-+ {a}{suc (e + d)})
+       | sym (suc-+ {suc a}{(e + d)})
+       | sym $ +-assoc (suc (suc a)) e d
+     = m+n<k⇒m<k {suc (a + e)} p
+
+  <-elim-fst-snd : ∀ {a b c d e} → a + b < suc c → b ≡ suc (d + e) → e < c
+  <-elim-fst-snd {a}{b}{c}{d}{e} p refl
+    rewrite
+      suc-+ {d} {e}
+      | sym $ +-assoc a d (suc e)
+      = <-prev (m+n<k⇒n<k p)
+
+  LEN>0 : ∀ {τ} → LEN τ > 0
+  LEN>0 {base x} = s≤s z≤n
+  LEN>0 {τ ⇒ σ} = s≤s z≤n
+
+  -- Sized version of symsym
+  ss : ∀ {n} → LEN τ < n → (p : τ ~ σ) → sym~ (sym~ p) ≡ p
+
+  sst : ∀ {n} → LEN σ' < n → suc (LEN δ + LEN τ) ≡ LEN σ' → (p : τ ~ σ) (i : Ins δ σ σ') → ∀ (q : σ ~ τ) → sym~ p ≡ q → sym~ (symh q i) ≡ suc p i
+  sst (s≤s nn) nne p (zero x) q e rewrite sym e
+                                              | sym (LEN~ x) | ss (m+n<k⇒m<k nn) x
+                                              | sym (LEN~ p) | ss (m+n<k⇒n<k nn) p = refl
+
+  sst {n = suc (suc m)} (s≤s nn) nne (suc {τ₁} {σ₁} {δ₁} {σ₁'} p x) (suc i) (suc {τ} {σ} {δ} {σ'} q y) e
+      rewrite sst (m+n<k⇒n<k nn)
+                  (sym (trans (LENins i) (cong (suc ∘′ (LEN _ +_)) (LEN~ q))))
+                  (sym~ q) i q (ss (<-elim-fst-snd nn (LENins i)) q)
+              | sym (cong sym~ e)
+              | sst (<-elim-mid {a = LEN _}{b = LEN _}{e = LEN τ} LEN>0 nn (LENins i))
+                    (sym (trans (LENins x) (cong (suc ∘′ (LEN _ +_)) (sym (LEN~ p))))) p x (sym~ p) refl
+              = refl
+  ss nn zero = refl
+  ss nn (suc p i)
+    = let
+        r = sym $ trans (LENins i) (cong (suc ∘′ (LEN _ +_)) (sym $ LEN~ p))
+      in sst (<-subl nn r) r p i (sym~ p) refl
+
+  -- We can oviously chose a number that is greater than `LEN τ`.
+  -- We chose `1 + LEN τ`, which is given by ≤-refl.
+  symsym : (p : τ ~ σ) → sym~ (sym~ p) ≡ p
+  symsym p = ss ≤-refl p
+
 
 
 -- FIXME: termination chcker gets upset
