@@ -6,7 +6,7 @@ open import Data.Sum hiding ([_,_])
 open import Data.Product
 open import Data.Empty
 
-module lam-alt (n : ℕ) where
+module lam-alt-problem (n : ℕ) where
 
 data Ty : Set
 

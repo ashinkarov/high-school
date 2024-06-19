@@ -134,8 +134,13 @@ module _ where
   wknf   : (v : τ ∈ Γ) → Nf (Γ / v) σ → Nf Γ σ
   wksp   : (v : τ ∈ Γ) → Sp (Γ / v) σ δ → Sp Γ σ δ
 
+  wkne   : (v : τ ∈ Γ) → Ne (Γ / v) σ → Ne Γ σ
+  wkne v (app w s) = app (wkv v w) (wksp v s)
+
+
   wknf v (lam e) = lam (wknf (vₛ v) e)
-  wknf v (ne (app w s)) = ne (app (wkv v w) (wksp v s))
+  --wknf v (ne (app w s)) = ne (app (wkv v w) (wksp v s))
+  wknf v (ne n) = ne (wkne v n)
 
   wksp v ε = ε
   wksp v (x ◃ s) = wknf v x ◃ wksp v s
@@ -241,7 +246,7 @@ ext-var {σ = σ ⇒ σ'} v = ext-var {σ = σ'} (vₛ v)
 -- ins-var : Ins δ σ σ' → Var (ext σ' Γ) δ
 -- ins-var {σ = σ} (zero p) = var p (ext-var {σ = σ} v₀)
 -- ins-var (suc i) = ins-var i
-
+{-
 -- Compute renaming from the _~_
 module _ where
   perm~ : τ ~ σ → Ren Γ Δ → Ren (ext τ Γ) (ext σ Δ)
@@ -310,7 +315,7 @@ module _ where
   rensp {τ = τ}{σ = σ} r i=j (_◃_ {τ = τ'} x s)
     = rennf (ext-ren {τ = τ'} r) refl x ◃ rensp {τ = τ}{σ = σ} r i=j s
 
-
+-}
 
 appsp : Sp Γ τ (σ ⇒ δ) → Nf Γ σ → Sp Γ τ δ
 appsp ε       e = e ◃ ε
@@ -327,7 +332,7 @@ nenf {σ = τ ⇒ δ}  (app v s) = lam (nenf (app (vₛ v) (appsp (wksp v₀ s) 
 id-nf : Nf Γ (σ ⇒ σ)
 id-nf = lam (nenf (app v₀ ε))
 
-
+{-
 module SanityRenTest where
   testtm : Nf Γ (τ ⇒ σ ⇒ τ)
   testtm = lam (lam (nvar (vₛ v₀)))
@@ -362,6 +367,8 @@ module SanityRenTest where
                 ◃ ne (app (vₛ (vₛ v₀)) ε)
                 ◃ ε)))))
   _ = refl
+
+-}
 
 -- These have to be defined mutually
 module _ where
@@ -551,25 +558,63 @@ module _ where
   soundsp zero = ε
   soundsp {τ} {σ} (suc p~ i) = sp-step (soundsp p~) i
 
+  inscod : Ins δ σ σ' → cod σ' ≡ cod σ
+  inscod (zero x) = refl
+  inscod (suc i) = inscod i
+
+  soundsp' : τ ~ σ → Sp (ext σ (Γ )) τ (base $ cod σ)
+  soundsp' zero = ε
+  soundsp' {τ} {σ} (suc p x) rewrite inscod x = sp-step (soundsp' p) x 
+
   sound-fun {τ} {σ} p~ =
     let
-      sp = soundsp {Γ = _ ▹ τ} p~
-      -- TODO: try to get rid of this conversion
-      sp' = subst (λ x → Sp (ext σ _) τ (base x)) (cod~ p~) sp
-    in lam (foldnf (ne (app (ext-var {σ = σ} v₀) sp')))
+      --sp = soundsp {Γ = _ ▹ τ} p~
+      ---- TODO: try to get rid of this conversion
+      --sp' = subst (λ x → Sp (ext σ _) τ (base x)) (cod~ p~) sp
+      a = 0
+    in lam (foldnf (ne (app (ext-var {σ = σ} v₀) (soundsp' p~))))
+    --in lam ? -- (foldnf (ne (app (ext-var {σ = σ} v₀) (soundsp' p~))))
 
   sound-funε : τ ~ σ → Nf ε (τ ⇒ σ)
   sound-funε = sound-fun
 
+-- Helper functions for sound-retr
+wkfold : (v : σ ∈ Γ) (x : Nf (ext τ (Γ / v)) (base $ cod τ))
+       → wknf v (foldnf {τ = τ} x) ≡ foldnf (ext-wk-nf' {σ = τ} v x)
+wkfold {τ = base _} v x = refl
+wkfold {τ = _ ⇒ _ } v x = cong lam (wkfold (vₛ v) x)
+
+wk-appsp :  (v : τ' ∈ Γ) (s : Sp (Γ / v) τ (σ ⇒ δ)) (x : Nf (Γ / v) σ) 
+         → wksp v (appsp s x) ≡ appsp (wksp v s) (wknf v x)
+wk-appsp v ε x = refl
+wk-appsp v (x₁ ◃ s) x = cong (_ ◃_) (wk-appsp v s x)
+--appsp : Sp Γ τ (σ ⇒ δ) → Nf Γ σ → Sp Γ τ δ
+
+
+
+wksp-wksp : (v : τ' ∈ Γ) (s : Sp ((Γ) / v) τ σ) 
+          → wksp (vₛ {σ = σ'} v) (wksp v₀ s) ≡ wksp v₀ (wksp v s)
+wksp-wksp v ε = refl
+wksp-wksp v (x ◃ s) = cong₂ _◃_ ? (wksp-wksp v s)
+
+wk-nenf : (v : τ ∈ Γ) (x : Ne (Γ / v) σ) → wknf v (nenf x) ≡ nenf (wkne v x)
+wk-nenf {σ = base x₁} v x = refl
+wk-nenf {σ = σ ⇒ σ₁} v (app w s) 
+  = trans 
+     (cong lam (wk-nenf (vₛ v) (app (vₛ w) (appsp (wksp v₀ s) (nvar v₀)))))
+     (cong (λ x → lam (nenf (app _ x)))
+           (trans (wk-appsp (vₛ v) _ _) ?))
+
 
 sound-retr : (στ : σ ~ τ) → (sound-funε στ) ∘-nf (sound-funε (sym~ στ)) ≡ id-nf
-sound-retr = {!!}
+sound-retr zero = refl
+sound-retr {σ} {τ} (suc p x) = ?
 
 sound : σ ~ τ → σ ≅ τ
-φ (sound στ) = sound-fun στ
-ψ (sound στ) = sound-fun (sym~ στ)
+φ (sound στ) = sound-funε στ
+ψ (sound στ) = sound-funε (sym~ στ)
 φψ (sound στ) = sound-retr στ
-ψφ (sound στ) = {!!} -- use rewrite symsym
+ψφ (sound {σ} {τ} στ) = trans (cong (sound-funε (sym~ στ) ∘-nf_) (cong (sound-funε) (sym $ symsym στ))) (sound-retr (sym~ στ))
 
 {-
 types are hedperm ⇒ definitional iso
